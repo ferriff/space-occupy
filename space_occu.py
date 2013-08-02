@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# federico.ferri@cern.ch, 01.08.2013
+# federico dot ferri at cern dot ch, 01.08.2013
 #
 
 import os
@@ -18,15 +18,16 @@ Options are available to customize most of the program parameters.
 """
 
 parser = OptionParser(usage = '%prog [options]', version = 'v0.0', description=descr)
-parser.add_option('-s', '--size', dest = 'size', default = 1, help = 'size of output file in MBytes [%default]')
-parser.add_option('-d', '--dir', dest = 'odir', default = '.', help = 'output directory [%default]')
 parser.add_option('-c', '--count', dest = 'cnt', default = 1, help = 'start numbering files from CNT [%default]')
-parser.add_option('-o', '--output_file', dest = 'ofile', default = 'output.dat', help = 'output file [%default]')
+parser.add_option('-d', '--dir', dest = 'odir', default = '.', help = 'output directory [%default]')
+parser.add_option('-D', '--daemon', dest = 'daemon', action = 'store_true', default = False, help = 'deamonize and automatically write files to fill quota [%default]')
 parser.add_option('-f', '--fraction', dest = 'qfrac', default = 0.5, help = 'fill this fraction of the available space [%default]')
 parser.add_option('-g', '--sigma', dest = 'gsigma', default = 0.1, help = 'sigma of the gaussian fluctuation of the output file size [%default]')
+parser.add_option('-l', '--log_file', dest = 'lfile', default = sys.stdout, help = 'log file [stdout]')
+parser.add_option('-o', '--output_file', dest = 'ofile', default = 'output.dat', help = 'output file [%default]')
 parser.add_option('-p', '--polling_time', dest = 'ptime', default = 60, help = 'interval (seconds) between polling requests for available space in daemon mode [%default]')
 parser.add_option('-q', '--quota_path', dest = 'qpath', default = ".", help = 'path to check the quota of [%default]')
-parser.add_option('-D', '--daemon', dest = 'daemon', action = 'store_true', default = False, help = 'deamonize and automatically write files to fill quota [%default]')
+parser.add_option('-s', '--size', dest = 'size', default = 1, help = 'size of output file in MBytes [%default]')
 
 (options, args) = parser.parse_args()
 
@@ -42,11 +43,14 @@ cnt = int(options.cnt)
 
 letters = list(lowercase + uppercase)
 
+def flog(of, s):
+        of.write('[%.2f] "' % time.time() + time.ctime() + '" ' + s + "\n")
+
 def write_file(of, size):
         global cnt
         s = of.rsplit(".", 1)
         of = s[0] + "_" + str(cnt) + "_" + "".join(random.sample(letters, 4)) + "." + s[1]
-        print "writing:", of
+        flog(lfile, "writing " + of)
         fout = open(of, 'wb')
         fout.write(os.urandom(size))
         fout.close()
@@ -54,7 +58,7 @@ def write_file(of, size):
 
 
 def free_space(path):
-        print "checking quota for path `" + path + "'"
+        flog(lfile, "checking quota for path `" + path + "'")
         (sin, sout) = os.popen2(["df", path])
         fs = 0
         first = False
@@ -68,7 +72,7 @@ def free_space(path):
 
 def fill_quota(odir, nbytes, frac):
         nfiles = int(nbytes * frac) / size
-        print "going to write", nfiles, "file(s)"
+        flog(lfile, "going to write " + str(nfiles) + " file(s)")
         for i in range(nfiles):
                 s = int(size * random.gauss(1, gsigma))
                 nbytes -= s
@@ -82,7 +86,6 @@ def main_loop(ifork = False):
                 if ifork:
                         pid = os.fork()
                 if pid == 0:
-                        print "child process"
                         time.sleep(ptime)
                         main_loop()
                         sys.exit(0)
@@ -95,8 +98,8 @@ def main_loop(ifork = False):
 if daemon:
         pid = os.fork()
         if pid == 0:
-                print "daemonizing..."
-                print "polling time:", ptime, "second(s)"
+                flog(lfile, "daemonizing...")
+                flog(lfile, "polling time: " + str(ptime) + " second(s)")
                 main_loop()
         else:
                 sys.exit(0)
