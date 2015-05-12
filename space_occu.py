@@ -40,6 +40,7 @@ qfrac = float(options.qfrac)
 gsigma = float(options.gsigma)
 daemon = options.daemon
 cnt = int(options.cnt)
+lfile = options.lfile
 
 letters = list(lowercase + uppercase)
 
